@@ -35,36 +35,40 @@ function header {
 }
 header
 
-#remove active sessions
-Get-PSSession | Remove-PSSession  -ea 0
+#query active sessions
+if ((Get-PSSession).ComputerName -notmatch "outlook.office365"){    
 
-#########################################################
-#cloud credentials
-Write-Host "Bitte die Cloud-Credentials eingeben:" -f Yellow
-$credential = Get-Credential "user@domain.de"
+    Get-PSSession | Remove-PSSession  -ea 0
 
-#import office 365 session
-$proxysettings = New-PSSessionOption -ProxyAccessType IEConfig
-$Session = New-PSSession -ConfigurationName Microsoft.Exchange `
-    -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $credential `
-    -Authentication Basic -AllowRedirection
-######################################################################
-#o365 session
-Import-PSSession $Session -wa 0 -AllowClobber
+    #########################################################
+    #cloud credentials
+    Write-Host "Bitte die Cloud-Credentials eingeben:" -f Yellow
+    $credential = Get-Credential "user@domain.de"
 
-Start-Sleep 5
+    #import office 365 session
+    $proxysettings = New-PSSessionOption -ProxyAccessType IEConfig
+    $Session = New-PSSession -ConfigurationName Microsoft.Exchange `
+        -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $credential `
+        -Authentication Basic -AllowRedirection
+    ######################################################################
+    #o365 session
+    Import-PSSession $Session -wa 0 -AllowClobber
+    Start-Sleep 5
 
-if (!(Get-PSSession $Session)) {
-    Write-Host "connect via ie proxy settings..." -ForegroundColor Yellow
+    if (!(Get-PSSession $Session)) {
+        Write-Host "connect via ie proxy settings..." -ForegroundColor Yellow
  
-    $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection -SessionOption $proxysettings
-    Start-Sleep 3
-    Import-PSSession $Session -AllowClobber -ea 0 SilentlyContinue -wa 0
-}  
-if (!(Get-PSSession $Session)) {
-    Write-Host "Connection to Office 365 has failed!" -ForegroundColor Red 
-    break   
+        $Session = New-PSSession -ConfigurationName Microsoft.Exchange -ConnectionUri https://outlook.office365.com/powershell-liveid/ -Credential $UserCredential -Authentication Basic -AllowRedirection -SessionOption $proxysettings
+        Start-Sleep 3
+        Import-PSSession $Session -AllowClobber -ea 0 SilentlyContinue -wa 0
+    }  
+    if (!(Get-PSSession $Session)) {
+        Write-Host "Connection to Office 365 has failed!" -ForegroundColor Red 
+        break   
+    }
+
 }
+
 
 cls
 header
@@ -77,18 +81,14 @@ $credential = Get-Credential "DOMAIN\logonname"
 Remove-MoveRequest $SourceMailbox -Confirm:$false -ea 0 -wa 0
 
 #targetDeliveryDomain
-$targetdomain = (Get-FederatedOrganizationIdentifier).DefaultDomain
-#okay $targetdomain
+$targetdomain = (Get-AcceptedDomain | ? { $_.DomainName -match "mail" }).name
 
+Write-Host "Is this target domain correct? $targetdomain [y / n]" -ForegroundColor Yellow
 
-if ($targetdomain -match "mail.onmicrosoft.com") {
-    Write-Host "SMTP Ziel Domain:`n
-    [$targetdomain]`n" -f Green
-} else {
-    cls
-    header
-    Write-Host "Bitte die SMTP Email Domain eingeben -> TENANTNAME.mail.onmicrosoft.com :" -f Yellow
-    $domain = Read-Host "TENANT.mail.onmicrosoft.com"
+$input = Read-Host
+if($input -match "n"){
+    Write-Host "please enter the target mail domain [Get-AcceptedDomain]"
+    $global:targetdomain = Read-Host "Bitte die target mail domain eintragen [TENANTNAME.mail.onmicrosoft.com]"
 }
 
 cls
